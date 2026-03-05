@@ -1,0 +1,343 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Bayou Lite</title>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#0a0a0a;--surface:#111;--border:#222;
+  --text:#ddd;--muted:#555;--accent:#7cb87c;
+  --mono:'Courier New',monospace;
+  --h:36px;
+}
+html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--mono);font-size:12px;overflow:hidden}
+
+/* TABS */
+#tabs{height:var(--h);background:var(--surface);border-bottom:1px solid var(--border);display:flex;align-items:flex-end;padding:0 4px;gap:2px;overflow-x:auto;flex-shrink:0}
+#tabs::-webkit-scrollbar{height:2px}
+#tabs::-webkit-scrollbar-thumb{background:var(--border)}
+.tab{height:28px;min-width:100px;max-width:160px;background:var(--bg);border:1px solid var(--border);border-bottom:none;border-radius:4px 4px 0 0;display:flex;align-items:center;gap:4px;padding:0 6px 0 8px;cursor:pointer;font-size:11px;color:var(--muted);flex-shrink:0;user-select:none}
+.tab.active{background:var(--bg);color:var(--text);border-bottom-color:var(--bg);margin-bottom:-1px;height:29px}
+.tab-title{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tab-x{width:14px;height:14px;border:none;background:none;color:var(--muted);cursor:pointer;font-size:13px;line-height:1;flex-shrink:0;padding:0;display:flex;align-items:center;justify-content:center}
+.tab-x:hover{color:#e07070}
+.tab-new{height:24px;width:24px;min-width:24px;border:1px solid var(--border);border-radius:4px;background:none;color:var(--muted);cursor:pointer;font-size:16px;margin-bottom:4px;display:flex;align-items:center;justify-content:center;flex-shrink:0;line-height:1}
+.tab-new:hover{color:var(--accent);border-color:var(--accent)}
+
+/* CHROME */
+#chrome{height:var(--h);background:var(--surface);border-bottom:1px solid var(--border);display:flex;align-items:center;gap:3px;padding:0 6px;flex-shrink:0}
+.cbtn{width:26px;height:26px;border:none;background:none;color:var(--muted);cursor:pointer;display:flex;align-items:center;justify-content:center;border-radius:4px;font-size:14px;flex-shrink:0}
+.cbtn:hover{background:var(--border);color:var(--text)}
+.cbtn:disabled{opacity:0.25;cursor:not-allowed}
+#addr{flex:1;padding:5px 8px;background:var(--bg);border:1px solid var(--border);border-radius:4px;color:var(--text);font-family:var(--mono);font-size:12px;outline:none}
+#addr:focus{border-color:var(--accent)}
+#addr::placeholder{color:var(--muted)}
+#go{padding:5px 10px;background:var(--accent);border:none;border-radius:4px;color:#0a1205;font-family:var(--mono);font-size:11px;cursor:pointer;flex-shrink:0;font-weight:bold}
+#go:hover{filter:brightness(1.1)}
+
+/* CONTENT */
+#content{flex:1;position:relative;overflow:hidden}
+#frames{position:absolute;inset:0}
+.bframe{position:absolute;inset:0;display:none}
+.bframe.active{display:flex;flex-direction:column}
+.pframe{flex:1;width:100%;border:none;background:#fff}
+.loading{position:absolute;inset:0;background:var(--bg);display:flex;align-items:center;justify-content:center;flex-direction:column;gap:10px;font-size:11px;color:var(--muted);z-index:10}
+.spinner{width:20px;height:20px;border:2px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin 0.7s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* NEW TAB */
+.newtab{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:20px;background:var(--bg)}
+.nt-logo{font-family:var(--mono);font-size:32px;color:var(--accent);letter-spacing:-1px}
+.nt-sub{font-size:10px;color:var(--muted);letter-spacing:2px;text-transform:uppercase}
+.nt-input{width:100%;max-width:420px;padding:10px 14px;background:var(--surface);border:1px solid var(--border);border-radius:6px;color:var(--text);font-family:var(--mono);font-size:13px;outline:none}
+.nt-input:focus{border-color:var(--accent)}
+.nt-input::placeholder{color:var(--muted)}
+.nt-shortcuts{display:flex;gap:8px;flex-wrap:wrap;justify-content:center;max-width:420px}
+.sc{padding:6px 12px;background:var(--surface);border:1px solid var(--border);border-radius:4px;color:var(--muted);font-family:var(--mono);font-size:11px;cursor:pointer;transition:all 0.1s}
+.sc:hover{border-color:var(--accent);color:var(--accent)}
+
+/* PROGRESS */
+#pbar{position:fixed;top:0;left:0;height:1px;background:var(--accent);z-index:9999;transition:width 0.2s,opacity 0.4s;width:0%;opacity:0;pointer-events:none}
+#pbar.on{opacity:1}
+
+/* TOAST */
+.toast{position:fixed;bottom:16px;left:50%;transform:translateX(-50%) translateY(50px);background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:8px 16px;font-size:11px;color:var(--text);z-index:9999;transition:transform 0.2s,opacity 0.2s;opacity:0;white-space:nowrap}
+.toast.on{transform:translateX(-50%) translateY(0);opacity:1}
+.toast.ok{border-color:var(--accent);color:var(--accent)}
+.toast.err{border-color:#e07070;color:#e07070}
+
+/* CONTEXT MENU */
+#ctx{position:fixed;z-index:99999;background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:4px;min-width:160px;display:none;box-shadow:0 8px 24px rgba(0,0,0,0.6)}
+#ctx.on{display:block}
+.ci{display:flex;align-items:center;gap:8px;padding:6px 10px;border-radius:4px;font-size:11px;color:var(--muted);cursor:pointer;border:none;background:none;width:100%;font-family:var(--mono);text-align:left}
+.ci:hover{background:var(--border);color:var(--text)}
+.csep{height:1px;background:var(--border);margin:3px 0}
+
+body{display:flex;flex-direction:column;height:100vh}
+#content{display:flex;flex:1;overflow:hidden}
+</style>
+</head>
+<body>
+
+<div id="pbar"></div>
+
+<div id="tabs">
+  <div id="tab-list"></div>
+  <button class="tab-new" onclick="newTab()" title="New tab (Ctrl+T)">+</button>
+</div>
+
+<div id="chrome">
+  <button class="cbtn" id="btn-back" onclick="goBack()" title="Back" disabled>&#8592;</button>
+  <button class="cbtn" id="btn-fwd" onclick="goFwd()" title="Forward" disabled>&#8594;</button>
+  <button class="cbtn" onclick="reload()" title="Reload">&#8635;</button>
+  <input type="text" id="addr" placeholder="Search or enter URL..." autocomplete="off" spellcheck="false"
+    onkeydown="if(event.key==='Enter')go(this.value)" onfocus="this.select()">
+  <button id="go" onclick="go(document.getElementById('addr').value)">Go</button>
+</div>
+
+<div id="content">
+  <div id="frames"></div>
+</div>
+
+<div id="ctx">
+  <button class="ci" id="ctx-newtab">+ Open in New Tab</button>
+  <button class="ci" id="ctx-copy">&#x2398; Copy Link</button>
+  <div class="csep"></div>
+  <button class="ci" id="ctx-save">&#8595; Save File</button>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const PROXY = 'https://boyouproxy.netlify.app/.netlify/functions/proxy?url=';
+const SEARCH = 'https://www.google.com/search?q=';
+
+let tabs = [], activeId = null, ptimer = null;
+let ctxUrl = null;
+
+function gid(){ return Math.random().toString(36).slice(2,9); }
+function $(id){ return document.getElementById(id); }
+
+function esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+/* ── TABS ── */
+function newTab(url='') {
+  const id = gid();
+  const frame = document.createElement('div');
+  frame.className = 'bframe';
+  frame.id = 'f-'+id;
+  $('frames').appendChild(frame);
+  tabs.push({id, title:'New Tab', url:'', frame, loading:false, history:[], histIdx:-1});
+  activate(id);
+  if(url) navigate(url, id);
+  else renderNewTab(tabs.find(t=>t.id===id));
+  renderTabs();
+}
+
+function renderTabs() {
+  const list = $('tab-list');
+  list.innerHTML = '';
+  tabs.forEach(t => {
+    const el = document.createElement('div');
+    el.className = 'tab' + (t.id===activeId?' active':'');
+    el.onclick = e => { if(!e.target.classList.contains('tab-x')) activate(t.id); };
+    const title = document.createElement('span');
+    title.className = 'tab-title';
+    title.textContent = t.loading ? 'Loading...' : (t.title||'New Tab');
+    const x = document.createElement('button');
+    x.className = 'tab-x';
+    x.textContent = '×';
+    x.onclick = e => { e.stopPropagation(); closeTab(t.id); };
+    el.appendChild(title);
+    el.appendChild(x);
+    list.appendChild(el);
+  });
+}
+
+function activate(id) {
+  activeId = id;
+  tabs.forEach(t => t.frame.classList.toggle('active', t.id===id));
+  const t = tabs.find(x=>x.id===id);
+  if(t) { $('addr').value = t.url||''; updNav(); }
+  renderTabs();
+}
+
+function closeTab(id) {
+  const idx = tabs.findIndex(x=>x.id===id);
+  if(idx<0) return;
+  tabs[idx].frame.remove();
+  tabs.splice(idx,1);
+  if(!tabs.length){ newTab(); return; }
+  if(activeId===id) activate(tabs[Math.min(idx,tabs.length-1)].id);
+  else renderTabs();
+}
+
+/* ── NAV ── */
+function go(raw) {
+  if(!raw||!raw.trim()) return;
+  let url = raw.trim();
+  const isUrl = /^https?:\/\//i.test(url) || /^[a-z0-9]+([\-.]?[a-z0-9]+)*\.[a-z]{2,}(:\d+)?(\/.*)?$/i.test(url);
+  if(!isUrl) url = SEARCH + encodeURIComponent(url);
+  else if(!/^https?:\/\//i.test(url)) url = 'https://'+url;
+  navigate(url);
+}
+
+function navigate(url, tid=activeId, skipHist=false) {
+  const t = tabs.find(x=>x.id===tid);
+  if(!t) return;
+  t.url = url; t.title = 'Loading...'; t.loading = true;
+  $('addr').value = url;
+  if(!skipHist && url) {
+    t.history = t.history.slice(0, t.histIdx+1);
+    t.history.push(url);
+    t.histIdx = t.history.length-1;
+  }
+  updNav(); renderTabs();
+  loadFrame(t, url);
+}
+
+function loadFrame(t, url) {
+  const proxied = PROXY + encodeURIComponent(url);
+  const safeId = t.id;
+
+  const loading = document.createElement('div');
+  loading.className = 'loading';
+  loading.id = 'fl-'+safeId;
+  loading.innerHTML = '<div class="spinner"></div><div>Loading...</div>';
+
+  const iframe = document.createElement('iframe');
+  iframe.className = 'pframe';
+  iframe.id = 'if-'+safeId;
+  iframe.src = proxied;
+  iframe.setAttribute('sandbox','allow-forms allow-modals allow-pointer-lock allow-popups allow-popups-to-escape-sandbox allow-presentation allow-same-origin allow-scripts allow-top-navigation allow-top-navigation-by-user-activation');
+  iframe.setAttribute('allow','accelerometer; autoplay; clipboard-write; encrypted-media; fullscreen; gyroscope; picture-in-picture');
+  iframe.onload = () => onLoad(safeId, url);
+  iframe.onerror = () => onErr(safeId);
+
+  t.frame.innerHTML = '';
+  t.frame.appendChild(loading);
+  t.frame.appendChild(iframe);
+  startP();
+}
+
+function onLoad(tid, url) {
+  const t = tabs.find(x=>x.id===tid);
+  if(!t) return;
+  t.loading = false;
+  try { const tt = $('if-'+tid)?.contentDocument?.title; t.title = tt || new URL(url).hostname; }
+  catch(e) { try { t.title = new URL(url).hostname; } catch(e2){ t.title = url; } }
+  $('fl-'+tid)?.remove();
+  stopP(); renderTabs();
+  if(activeId===tid) $('addr').value = url;
+}
+
+function onErr(tid) {
+  const t = tabs.find(x=>x.id===tid);
+  if(!t) return;
+  t.loading = false;
+  $('fl-'+tid)?.remove();
+  stopP(); renderTabs();
+  toast('Failed to load.','err');
+}
+
+function renderNewTab(t) {
+  const tid = t.id;
+  t.frame.innerHTML = `
+    <div class="newtab">
+      <div>
+        <div class="nt-logo">bayou lite</div>
+        <div class="nt-sub">fast. light. private.</div>
+      </div>
+      <input class="nt-input" id="nt-${tid}" placeholder="Search or enter a URL..." autocomplete="off" spellcheck="false">
+      <div class="nt-shortcuts" id="sc-${tid}">
+        <button class="sc" data-url="https://google.com">Google</button>
+        <button class="sc" data-url="https://wikipedia.org">Wikipedia</button>
+        <button class="sc" data-url="https://old.reddit.com">Reddit</button>
+        <button class="sc" data-url="https://github.com">GitHub</button>
+        <button class="sc" data-url="https://news.ycombinator.com">HN</button>
+      </div>
+    </div>`;
+  const inp = t.frame.querySelector('#nt-'+tid);
+  inp?.addEventListener('keydown', e => { if(e.key==='Enter') navigate(e.target.value.trim(), tid); });
+  t.frame.querySelectorAll('#sc-'+tid+' .sc').forEach(btn =>
+    btn.addEventListener('click', () => navigate(btn.dataset.url, tid))
+  );
+  setTimeout(() => inp?.focus(), 80);
+}
+
+function goBack() {
+  const t = tabs.find(x=>x.id===activeId);
+  if(!t||t.histIdx<=0) return;
+  t.histIdx--;
+  navigate(t.history[t.histIdx], activeId, true);
+}
+function goFwd() {
+  const t = tabs.find(x=>x.id===activeId);
+  if(!t||t.histIdx>=t.history.length-1) return;
+  t.histIdx++;
+  navigate(t.history[t.histIdx], activeId, true);
+}
+function reload() {
+  const t = tabs.find(x=>x.id===activeId);
+  if(t?.url) navigate(t.url, activeId, true);
+}
+function updNav() {
+  const t = tabs.find(x=>x.id===activeId);
+  $('btn-back').disabled = !t||t.histIdx<=0;
+  $('btn-fwd').disabled = !t||t.histIdx>=t.history.length-1;
+}
+
+/* ── PROGRESS ── */
+function startP(){ const b=$('pbar');b.style.width='0%';b.classList.add('on');let w=0;clearInterval(ptimer);ptimer=setInterval(()=>{w=Math.min(w+Math.random()*15,88);b.style.width=w+'%';},180); }
+function stopP(){ clearInterval(ptimer);const b=$('pbar');b.style.width='100%';setTimeout(()=>{b.style.width='0%';b.classList.remove('on');},350); }
+
+/* ── TOAST ── */
+let tTimer;
+function toast(msg,type=''){
+  const el=$('toast');el.textContent=msg;el.className='toast'+(type?' '+type:'')+' on';
+  clearTimeout(tTimer);tTimer=setTimeout(()=>el.classList.remove('on'),2500);
+}
+
+/* ── CONTEXT MENU ── */
+$('ctx-newtab').onclick = () => { if(ctxUrl){ newTab(ctxUrl); } hideCtx(); };
+$('ctx-copy').onclick = () => { if(ctxUrl) navigator.clipboard.writeText(ctxUrl).then(()=>toast('Copied!','ok')); hideCtx(); };
+$('ctx-save').onclick = async () => {
+  if(!ctxUrl){ hideCtx(); return; }
+  const url = ctxUrl; hideCtx(); toast('Saving...');
+  try {
+    const res = await fetch(PROXY+encodeURIComponent(url));
+    const blob = await res.blob();
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = url.split('/').pop().split('?')[0]||'file';
+    a.click();
+    toast('Downloaded!','ok');
+  } catch(e){ toast('Failed.','err'); }
+};
+function hideCtx(){ $('ctx').classList.remove('on'); ctxUrl=null; }
+function showCtx(e, url){ ctxUrl=url; const x=Math.min(e.clientX,window.innerWidth-170),y=Math.min(e.clientY,window.innerHeight-120);$('ctx').style.left=x+'px';$('ctx').style.top=y+'px';$('ctx').classList.add('on'); }
+document.addEventListener('click',e=>{ if(!e.target.closest('#ctx')) hideCtx(); });
+
+/* ── IFRAME MESSAGES ── */
+window.addEventListener('message', e => {
+  if(!e.data||typeof e.data!=='object') return;
+  if(e.data.type==='BAYOU_NAVIGATE' && e.data.url) navigate(e.data.url);
+  if(e.data.type==='BAYOU_CONTEXTMENU') showCtx({clientX:e.data.x,clientY:e.data.y}, e.data.url);
+});
+
+/* ── KEYBOARD ── */
+document.addEventListener('keydown', e => {
+  if((e.ctrlKey||e.metaKey)&&e.key==='t'){ e.preventDefault(); newTab(); }
+  if((e.ctrlKey||e.metaKey)&&e.key==='w'){ e.preventDefault(); closeTab(activeId); }
+  if((e.ctrlKey||e.metaKey)&&e.key==='l'){ e.preventDefault(); $('addr').focus(); $('addr').select(); }
+  if((e.ctrlKey||e.metaKey)&&e.key==='r'){ e.preventDefault(); reload(); }
+  if(e.key==='Escape') hideCtx();
+});
+
+// Boot
+newTab();
+</script>
+</body>
+</html>
